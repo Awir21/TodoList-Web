@@ -1,145 +1,279 @@
-//Initial References
-const newTaskInput = document.querySelector("#new-task input");
-const tasksDiv = document.querySelector("#tasks");
-let deleteTasks, editTasks, tasks;
-let updateNote = "";
-let count;
+// Getting a raw json previously stored on local storage
+let list = JSON.parse(localStorage.getItem("list"));
+const toDo = document.querySelector("#to-do");
+const done = document.querySelector("#done");
+const form = document.querySelector("#form");
 
-//Function on window load
-window.onload = () => {
-  updateNote = "";
-  count = Object.keys(localStorage).length;
-  displayTasks();
+const defaultList = {
+  to_do_list: [
+    {
+      title: "🛒 Buy groceries",
+      description: "Milk, bread, eggs, cheese, fruits and vegetables.",
+      completed: false,
+    },
+    {
+      title: "📝 Finish project",
+      description: "Complete the final report and submit it by Friday.",
+      completed: true,
+    },
+    {
+      title: "🧼 Clean the house",
+      description: "Vacuum, dust, and clean the bathrooms.",
+      completed: false,
+    },
+    {
+      title: "💰 Pay bills",
+      description: "Electricity, water, and internet bills.",
+      completed: false,
+    },
+    {
+      title: "📞 Call mom",
+      description: "Check in and see how she's doing.",
+      completed: true,
+    },
+    {
+      title: "📅 Schedule appointment",
+      description: "Make an appointment with the dentist.",
+      completed: true,
+    },
+    {
+      title: "🏃‍♂️ Go for a run",
+      description: "Jog for 30 minutes.",
+      completed: true,
+    },
+    {
+      title: "📖 Read a book",
+      description: "Finish reading 'The Great Gatsby'.",
+      completed: true,
+    },
+    {
+      title: "✍️ Write a blog post",
+      description: "Come up with a topic and write a 500-word blog post.",
+      completed: true,
+    },
+    {
+      title: "🧹 Organize closet",
+      description:
+        "Sort clothes by category and donate items no longer needed.",
+      completed: true,
+    },
+  ],
 };
 
-//Function to Display The Tasks
-const displayTasks = () => {
-  if (Object.keys(localStorage).length > 0) {
-    tasksDiv.style.display = "inline-block";
+// This is in case our local storage is empty
+if (!list) {
+  localStorage.setItem("list", JSON.stringify(defaultList));
+  list = JSON.parse(localStorage.getItem("list"));
+}
+
+// Handles the list of items
+function getListData() {
+  toDo.innerHTML = "";
+  done.innerHTML = "";
+
+  // A handy var that will help us to render
+  // the list properly
+  let lastItem;
+
+  list.to_do_list.forEach((itm, index) => {
+    renderToDoItem(itm, index);
+    // This var always will hold the index
+    // of the last rendered item
+    lastItem = index;
+  });
+
+  if (toDo.childElementCount === 0) {
+    renderCompletedImg();
+  }
+
+  lastItem++;
+  createNewItemFields(lastItem);
+}
+
+// Renders items
+function renderToDoItem(itm, index) {
+  const title = document.createElement("textarea");
+  title.name = `n${index}-title`;
+  title.value = itm.title;
+  title.maxLength = 30;
+  title.addEventListener("change", handleItemsSubmit);
+
+  const desc = document.createElement("textarea");
+  desc.name = `n${index}-desc`;
+  desc.value = itm.description;
+  desc.style.height = "1.5rem";
+  desc.style.height = this.scrollHeight + "px";
+  desc.addEventListener("input", autoResize, false);
+  desc.addEventListener("click", autoResize, false);
+  desc.addEventListener("change", handleItemsSubmit);
+
+  const completed = document.createElement("input");
+  completed.type = "hidden";
+  completed.name = `n${index}-completed`;
+  completed.value = itm.completed;
+
+  // We need to create those two divs to respect
+  // our CSS structure
+  const wrapper = document.createElement("div");
+  const itmData = document.createElement("div");
+
+  itmData.classList.add("itm-data");
+  itmData.appendChild(title);
+  itmData.appendChild(desc);
+  itmData.appendChild(completed);
+
+  const checkBtn = document.createElement("span");
+  checkBtn.classList.add("material-symbols-outlined");
+  checkBtn.title = "Hold to delete this item";
+  checkBtn.addEventListener("long-press", removeItem);
+  checkBtn.addEventListener("click", checkItem);
+  checkBtn.setAttribute("data-long-press-delay", "100");
+  checkBtn.id = index;
+
+  wrapper.appendChild(itmData);
+  wrapper.appendChild(checkBtn);
+
+  if (itm.completed) {
+    checkBtn.innerText = "check_box";
+    done.appendChild(wrapper);
   } else {
-    tasksDiv.style.display = "none";
+    checkBtn.innerText = "check_box_outline_blank";
+    toDo.appendChild(wrapper);
   }
+}
 
-  //Clear the tasks
-  tasksDiv.innerHTML = "";
-  //Fetch All The Keys in local storage
+// Expands textareas when clicked
+function autoResize() {
+  this.style.height = "1.5rem";
+  this.style.height = this.scrollHeight + "px";
+}
 
-  let tasks = Object.keys(localStorage);
-  tasks = tasks.sort();
-  for (let key of tasks) {
-    let classValue = "";
+// Creates the fields for new items
+function createNewItemFields(index) {
+  const newItmWrapper = document.createElement("div");
+  const newItmData = document.createElement("div");
+  const newTitle = document.createElement("textarea");
 
-    //Get all values
-    let value = localStorage.getItem(key);
-    let taskInnerDiv = document.createElement("div");
-    taskInnerDiv.classList.add("task");
-    taskInnerDiv.setAttribute("id", key);
-    taskInnerDiv.innerHTML = `<span id="taskname">${key.split("_")[1]}</span>`;
+  newTitle.name = `n${index}-title`;
+  newTitle.maxLength = 30;
+  newTitle.placeholder = "✨ Create a new note...";
+  newTitle.addEventListener("change", handleItemsSubmit);
 
-    //localstorage would store boolean as string so we parse it to boolean back
-    let editButton = document.createElement("button");
-    editButton.classList.add("edit");
-    editButton.innerHTML = `<i class="fa-solid fa-pen-to-square"></i>`;
-    if (!JSON.parse(value)) {
-      editButton.style.visibility = "visible";
-    } else {
-      editButton.style.visibility = "hidden";
-      taskInnerDiv.classList.add("completed");
+  const newDesc = document.createElement("textarea");
+  newDesc.name = `n${index}-desc`;
+  newDesc.style.height = "1.5rem";
+  newDesc.style.height = this.scrollHeight + "px";
+  newDesc.placeholder = "Note description";
+  newDesc.addEventListener("input", autoResize, false);
+  newDesc.addEventListener("change", autoResize, false);
+  newDesc.addEventListener("change", handleItemsSubmit);
+
+  const newCompleted = document.createElement("input");
+  newCompleted.type = "hidden";
+  newCompleted.name = `n${index}-completed`;
+
+  newItmData.classList.add("itm-data");
+  newItmData.appendChild(newTitle);
+  newItmData.appendChild(newDesc);
+  newItmData.appendChild(newCompleted);
+
+  newItmWrapper.appendChild(newItmData);
+  toDo.appendChild(newItmWrapper);
+}
+
+// Handles a new item
+function handleItemsSubmit(e) {
+  const formData = new FormData(form);
+
+  // Creating an empty to-do list
+  const todoObject = {
+    to_do_list: [],
+  };
+
+  const formValues = formData.values();
+
+  for (const itx of formValues) {
+    let title = itx;
+    let description = formValues.next().value;
+    let completed = formValues.next().value;
+
+    if (title.trim() !== "" || description.trim() !== "") {
+      todoObject.to_do_list.push({
+        title,
+        description,
+        completed: completed === "true",
+      });
     }
-    taskInnerDiv.appendChild(editButton);
-    taskInnerDiv.innerHTML += `<button class="delete"><i class="fa-solid fa-trash"></i></button>`;
-    tasksDiv.appendChild(taskInnerDiv);
   }
 
-  //tasks completed
-  tasks = document.querySelectorAll(".task");
-  tasks.forEach((element, index) => {
-    element.onclick = () => {
-      //local storage update
-      if (element.classList.contains("completed")) {
-        updateStorage(element.id.split("_")[0], element.innerText, false);
-      } else {
-        updateStorage(element.id.split("_")[0], element.innerText, true);
-      }
-    };
-  });
+  let listSizes = [list.to_do_list.length, todoObject.to_do_list.length];
 
-  //Edit Tasks
-  editTasks = document.getElementsByClassName("edit");
-  Array.from(editTasks).forEach((element, index) => {
-    element.addEventListener("click", (e) => {
-      //Stop propogation to outer elements (if removed when we click delete eventually rhw click will move to parent)
-      e.stopPropagation();
+  list = todoObject;
+  saveItemsStorage();
 
-      //disable other edit buttons when one task is being edited
-      disableButtons(true);
-
-      //update input value and remove div
-      let parent = element.parentElement;
-      newTaskInput.value = parent.querySelector("#taskname").innerText;
-
-      //set updateNote to the task that is being edited
-      updateNote = parent.id;
-
-      //remove task
-      parent.remove();
-    });
-  });
-
-  //Delete Tasks
-  deleteTasks = document.getElementsByClassName("delete");
-  Array.from(deleteTasks).forEach((element, index) => {
-    element.addEventListener("click", (e) => {
-      e.stopPropagation();
-
-      //Delete from local storage and remove div
-      let parent = element.parentElement;
-      removeTask(parent.id);
-      parent.remove();
-      count -= 1;
-    });
-  });
-};
-
-//Disable Edit Button
-const disableButtons = (bool) => {
-  let editButtons = document.getElementsByClassName("edit");
-  Array.from(editButtons).forEach((element) => {
-    element.disabled = bool;
-  });
-};
-
-//Remove Task from local storage
-const removeTask = (taskValue) => {
-  localStorage.removeItem(taskValue);
-  displayTasks();
-};
-
-//Add tasks to local storage
-const updateStorage = (index, taskValue, completed) => {
-  localStorage.setItem(`${index}_${taskValue}`, completed);
-  displayTasks();
-};
-
-//Function To Add New Task
-document.querySelector("#push").addEventListener("click", () => {
-  //Enable the edit button
-  disableButtons(false);
-  if (newTaskInput.value.length == 0) {
-    alert("Please Enter A Task");
-  } else {
-    //Store locally and display from local storage
-    if (updateNote == "") {
-      //new task
-      updateStorage(count, newTaskInput.value, false);
-    } else {
-      //update task
-      let existingCount = updateNote.split("_")[0];
-      removeTask(updateNote);
-      updateStorage(existingCount, newTaskInput.value, false);
-      updateNote = "";
-    }
-    count += 1;
-    newTaskInput.value = "";
+  // This means that we'll only render
+  // the list again if an items was actually
+  // added
+  if (listSizes[0] < listSizes[1]) {
+    getListData();
   }
-});
+}
+
+// Saves the current list to the storage
+function saveItemsStorage() {
+  localStorage.setItem("list", JSON.stringify(list));
+}
+
+// Removes an item from the list
+function removeItem(e) {
+  let idToRemove = e.target.id;
+  const filteredList = list.to_do_list.filter((itm, index) => {
+    return index != idToRemove;
+  });
+  list.to_do_list = filteredList;
+
+  anime({
+    targets: e.target.parentElement,
+    duration: 500,
+    translateX: [0, 50],
+    opacity: [1, 0],
+    easing: "easeInExpo",
+    complete: function (anim) {
+      getListData();
+      saveItemsStorage();
+    },
+  });
+}
+
+// Checks/Unchecks an item
+function checkItem(e) {
+  let isCompleted = list.to_do_list[e.target.id].completed;
+  list.to_do_list[e.target.id].completed = !isCompleted;
+
+  anime({
+    targets: e.target.parentElement,
+    duration: 500,
+    translateX: [0, 50],
+    opacity: [1, 0],
+    easing: "easeInExpo",
+    complete: function (anim) {
+      getListData();
+      saveItemsStorage();
+    },
+  });
+}
+
+// Render a cool image when all items are done
+function renderCompletedImg() {
+  const upToDateImg = document.createElement("img");
+  const upToDateText = document.createElement("h3");
+
+  upToDateImg.src = "upToDate.svg";
+  upToDateImg.classList.add("up-to-date-img");
+
+  upToDateText.innerText = "Nice! You have finished all of your tasks.";
+  upToDateText.classList.add("up-to-date-txt");
+
+  toDo.appendChild(upToDateImg);
+  toDo.appendChild(upToDateText);
+}
